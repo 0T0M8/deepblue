@@ -1,0 +1,108 @@
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include "http.h"
+
+void send_response(int client, const char *type, const char *body)
+{
+    char header[256];
+    snprintf(header, sizeof(header),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %ld\r\n\r\n",
+        type, strlen(body));
+
+    write(client, header, strlen(header));
+    write(client, body, strlen(body));
+}
+
+const char *get_mime_type(const char *path)
+{
+    const char *ext = strrchr(path, '.');
+    if (!ext) return "application/octet-stream";
+
+    if (!strcmp(ext, ".html")) return "text/html";
+    if (!strcmp(ext, ".css"))  return "text/css";
+    if (!strcmp(ext, ".js"))   return "application/javascript";
+    if (!strcmp(ext, ".png"))  return "image/png";
+    if (!strcmp(ext, ".jpg"))  return "image/jpeg";
+    if (!strcmp(ext, ".svg"))  return "image/svg+xml";
+
+    return "application/octet-stream";
+}
+
+int serve_static(int client, const char *url_path)
+{
+    /* prevent ../ attacks */
+    if (strstr(url_path, "..")) {
+        send_response(client, "text/plain", "403 Forbidden");
+        return 1;
+    }
+
+    char fullpath[512];
+
+    /* root maps to index.html */
+    if (strcmp(url_path, "/") == 0)
+        snprintf(fullpath, sizeof(fullpath), "static/index.html");
+    else
+        snprintf(fullpath, sizeof(fullpath), ".%s", url_path);
+
+    struct stat st;
+    if (stat(fullpath, &st) < 0 || !S_ISREG(st.st_mode))
+        return 0; /* not static */
+
+    FILE *f = fopen(fullpath, "rb");
+    if (!f) {
+        send_response(client, "text/plain", "404 Not Found");
+        return 1;
+    }
+
+    char *buf = malloc(st.st_size);
+    fread(buf, 1, st.st_size, f);
+    fclose(f);
+
+    char header[256];
+    snprintf(header, sizeof(header),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %ld\r\n\r\n",
+        get_mime_type(fullpath), st.st_size);
+
+    write(client, header, strlen(header));
+    write(client, buf, st.st_size);
+
+    free(buf);
+    return 1;
+}
+
+/* ================= helpers ================= */
+
+char *get_body(const char *req)
+{
+    const char *p = strstr(req, "\r\n\r\n");
+    return p ? strdup(p + 4) : NULL;
+}
+
+char *get_query_param(const char *req, const char *key)
+{
+    const char *q = strchr(req, '?');
+    if (!q) return NULL;
+
+    char *query = strdup(q + 1);
+    char *tok = strtok(query, "&");
+
+    while (tok) {
+        char k[64], v[128];
+        if (sscanf(tok, "%63[^=]=%127s", k, v) == 2 &&
+            strcmp(k, key) == 0) {
+            free(query);
+            return strdup(v);
+        }
+        tok = strtok(NULL, "&");
+    }
+
+    free(query);
+    return NULL;
+}

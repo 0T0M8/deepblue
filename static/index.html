@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DirtBlue</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<div class="container">
+  <h1>🌊 DirtBlue User Manager</h1>
+
+  <section class="card">
+    <h2>Add / Update User</h2>
+
+    <form id="userForm">
+      <input type="hidden" id="id" />
+
+      <input type="text" id="name" placeholder="Name" required />
+      <input type="email" id="email" placeholder="Email" required />
+
+      <div class="actions">
+        <button type="submit">Save User</button>
+        <button type="button" class="secondary" onclick="resetForm()">Clear</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Users</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Name</th><th>Email</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="users"></tbody>
+    </table>
+  </section>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

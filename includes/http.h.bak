@@ -1,0 +1,15 @@
+#ifndef HTTP_H
+#define HTTP_H
+
+void send_response(int client, const char *type, const char *body);
+void send_file(int client, const char *path);
+
+/* helpers */
+char *get_body(const char *req);
+char *get_query_param(const char *req, const char *key);
+
+/* NEW */
+const char *get_mime_type(const char *path);
+int serve_static(int client, const char *url_path);
+
+#endif

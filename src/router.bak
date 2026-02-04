@@ -1,0 +1,68 @@
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "router.h"
+#include "http.h"
+#include "db.h"
+
+void route(int client, const char *req, sqlite3 *db)
+{
+    if (strstr(req, "GET / ")) {
+        send_file(client, "static/index.html");
+        return;
+    }
+
+    if (strstr(req, "GET /users")) {
+        char *json = db_get_users(db);
+        send_response(client, "application/json", json);
+        free(json);
+        return;
+    }
+
+    if (strstr(req, "POST /users")) {
+        char *body = get_body(req);
+        char name[128], email[128];
+
+        if (body &&
+            sscanf(body, "name=%127[^&]&email=%127s", name, email) == 2 &&
+            db_add_user(db, name, email) == 0)
+            send_response(client, "application/json", "{\"status\":\"created\"}");
+        else
+            send_response(client, "application/json", "{\"error\":\"create failed\"}");
+
+        free(body);
+        return;
+    }
+
+    if (strstr(req, "PUT /users")) {
+        char *body = get_body(req);
+        int id;
+        char name[128], email[128];
+
+        if (body &&
+            sscanf(body, "id=%d&name=%127[^&]&email=%127s",
+                   &id, name, email) == 3 &&
+            db_update_user(db, id, name, email) == 0)
+            send_response(client, "application/json", "{\"status\":\"updated\"}");
+        else
+            send_response(client, "application/json", "{\"error\":\"update failed\"}");
+
+        free(body);
+        return;
+    }
+
+    if (strstr(req, "DELETE /users")) {
+        char *id_str = get_query_param(req, "id");
+        int id = id_str ? atoi(id_str) : -1;
+        free(id_str);
+
+        if (id > 0 && db_delete_user(db, id) == 0)
+            send_response(client, "application/json", "{\"status\":\"deleted\"}");
+        else
+            send_response(client, "application/json", "{\"error\":\"delete failed\"}");
+
+        return;
+    }
+
+    send_response(client, "text/plain", "404");
+}
